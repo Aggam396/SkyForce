@@ -1,0 +1,503 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SKYFORCE</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#07111d;color:white;font-family:Arial,sans-serif;overflow:hidden}
+#game{position:fixed;inset:0}
+canvas{display:block}
+header{position:fixed;top:0;width:100%;padding:20px 30px;display:flex;justify-content:space-between;z-index:5;background:linear-gradient(#07111dcc,transparent)}
+.brand{font-size:22px;font-weight:900;letter-spacing:5px}
+.brand span{color:#7ee7f2}
+.currency{color:#e7c77d}
+.panel{background:#081925e8;border:1px solid #426174;padding:30px;backdrop-filter:blur(12px);border-radius:8px}
+#menu{position:fixed;top:18%;left:5%;width:min(440px,90%);z-index:4}
+.eyebrow{color:#7ee7f2;font-size:11px;letter-spacing:3px}
+h1{font-size:65px;line-height:.95;margin:20px 0}
+h1 span{color:#7ee7f2}
+.subtitle{color:#b8cbd8;line-height:1.6}
+.buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:25px}
+button{padding:14px;background:#142e40;color:white;border:1px solid #426174;cursor:pointer;font-weight:bold}
+button:hover{background:#24536b}
+.primary{background:#7ee7f2;color:#07111d}
+#mission,#hangar,#shop,#quests{display:none;position:fixed;z-index:8;inset:10% 5%;overflow:auto}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px}
+.card{background:#142c3c;padding:20px;border:1px solid #426174}
+.card p{color:#b8cbd8;font-size:13px}
+.price{color:#e7c77d;margin:12px 0}
+.close{float:right}
+#hud{display:none;position:fixed;inset:0;pointer-events:none;z-index:3;font-family:monospace}
+.hudbox{position:absolute;background:#061522aa;padding:15px;border:1px solid #7ee7f277;line-height:1.8}
+.hudleft{bottom:20px;left:20px}
+.hudright{bottom:20px;right:20px}
+.hudtop{top:90px;left:50%;transform:translateX(-50%)}
+.cyan{color:#7ee7f2}
+#crosshair{position:absolute;left:50%;top:50%;width:40px;height:40px;border:1px solid #7ee7f2;border-radius:50%;transform:translate(-50%,-50%)}
+#controls{display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:4;background:#07111dcc;padding:12px;font-size:11px;white-space:nowrap}
+#toast{display:none;position:fixed;top:25%;left:50%;transform:translateX(-50%);z-index:10;background:#071925;padding:20px;border:1px solid #7ee7f2;text-align:center}
+#loading{position:fixed;inset:0;z-index:20;background:radial-gradient(#29485b,#07111d);display:flex;align-items:end;padding:8%}
+#loading h2{font-size:45px;letter-spacing:5px}
+.bar{height:4px;background:#345;max-width:450px}
+.bar span{display:block;height:4px;background:#7ee7f2;width:0;animation:load 1.5s forwards}
+@keyframes load{to{width:100%}}
+@media(max-width:600px){
+#menu{top:14%;padding:20px}
+h1{font-size:48px}
+.buttons{gap:6px}
+#controls{font-size:8px}
+}
+</style>
+</head>
+<body>
+
+<div id="game"></div>
+
+<header>
+<div class="brand">SKY<span>FORCE</span></div>
+<div>
+<span id="rank">CADET / 01</span>
+<span class="currency"> ◈ <b id="credits">1200</b> CR</span>
+</div>
+</header>
+
+<section id="menu" class="panel">
+<div class="eyebrow">FLIGHT OPERATIONS // EST. 2042</div>
+<h1>OWN THE<br><span>SKY.</span></h1>
+<p class="subtitle">Master the skies. Complete missions, collect aircraft and build your elite squadron.</p>
+<div class="buttons">
+<button class="primary" onclick="startFlight()">▶ DEPLOY</button>
+<button onclick="showPanel('mission')">MISSIONS</button>
+<button onclick="showPanel('hangar')">HANGAR</button>
+<button onclick="showPanel('shop')">SQUADRON STORE</button>
+<button onclick="showPanel('quests')">QUEST LOG</button>
+<button onclick="toast('Settings coming soon')">SETTINGS</button>
+</div>
+</section>
+
+<section id="mission" class="panel">
+<button class="close" onclick="hidePanels()">CLOSE</button>
+<h2>MISSION SELECT</h2>
+<div id="missionCards" class="cards"></div>
+</section>
+
+<section id="hangar" class="panel">
+<button class="close" onclick="hidePanels()">CLOSE</button>
+<h2>AIRCRAFT HANGAR</h2>
+<div id="planeCards" class="cards"></div>
+</section>
+
+<section id="shop" class="panel">
+<button class="close" onclick="hidePanels()">CLOSE</button>
+<h2>SQUADRON STORE</h2>
+<div id="shopCards" class="cards"></div>
+</section>
+
+<section id="quests" class="panel">
+<button class="close" onclick="hidePanels()">CLOSE</button>
+<h2>QUEST LOG</h2>
+<div id="questCards" class="cards"></div>
+</section>
+
+<div id="hud">
+<div class="hudbox hudtop">
+<div class="cyan">SKYFORCE // TRAINING RANGE</div>
+OBJECTIVE: FLY THROUGH THE CHECKPOINTS
+</div>
+<div id="crosshair"></div>
+<div class="hudbox hudleft">
+ALT <span id="alt" class="cyan">2500</span> FT<br>
+SPD <span id="spd" class="cyan">420</span> KTS<br>
+HDG <span id="hdg" class="cyan">090</span>°
+</div>
+<div class="hudbox hudright">
+AIRFRAME: NOMINAL<br>
+ROUTE: <span id="route" class="cyan">0 / 5</span><br>
+TIME: <span id="timer">00:00</span>
+</div>
+</div>
+
+<div id="controls">W/S PITCH · A/D BANK · SHIFT BOOST · ESC RETURN TO BASE</div>
+<div id="toast"></div>
+
+<div id="loading">
+<div>
+<div class="eyebrow">SKYFORCE AEROSPACE</div>
+<h2>PREPARING<br>FLIGHT DECK</h2>
+<p>CALIBRATING FLIGHT SYSTEMS...</p>
+<div class="bar"><span></span></div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+let scene,camera,renderer,jet;
+let clock=new THREE.Clock();
+let active=false,keys={};
+let speed=1.15,heading=0,pitch=0,bank=0;
+let flightSeconds=0;
+let checkpoints=[],checkpointIndex=0;
+let credits=1200,completed=0;
+let owned=['Falcon X'];
+let selected='Falcon X';
+let pilotsOwned=[];
+
+const planes=[
+{name:'Falcon X',desc:'Balanced multirole aircraft.',price:0,stats:'SPEED 82 · AGILITY 78'},
+{name:'Viper R',desc:'Lightweight high-speed aircraft.',price:900,stats:'SPEED 90 · AGILITY 94'},
+{name:'Tempest 9',desc:'Advanced long-range aircraft.',price:1800,stats:'SPEED 96 · AGILITY 80'},
+{name:'Ghostwing',desc:'Experimental stealth-inspired aircraft.',price:3200,stats:'SPEED 88 · AGILITY 91'}
+];
+
+const missions=[
+{name:'First Light',type:'FLIGHT TRAINING',desc:'Fly through five navigation gates.',reward:350},
+{name:'Coastal Patrol',type:'ROUTE RECON',desc:'Complete a precision navigation route.',reward:500},
+{name:'High Altitude',type:'SKILL TRIAL',desc:'Fly through the high altitude gates.',reward:650}
+];
+
+function init(){
+scene=new THREE.Scene();
+scene.background=new THREE.Color(0x87b5d0);
+scene.fog=new THREE.Fog(0x9abdd0,180,1100);
+
+camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,2500);
+
+renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+document.getElementById('game').appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xd9efff,0x52606b,1.5));
+
+let sun=new THREE.DirectionalLight(0xfff1d6,1.8);
+sun.position.set(-200,350,100);
+scene.add(sun);
+
+let ground=new THREE.Mesh(
+new THREE.PlaneGeometry(5000,5000),
+new THREE.MeshStandardMaterial({color:0x667b67})
+);
+ground.rotation.x=-Math.PI/2;
+ground.position.y=-110;
+scene.add(ground);
+
+// Mountains
+for(let i=0;i<55;i++){
+let h=35+Math.random()*100;
+let r=35+Math.random()*65;
+let m=new THREE.Mesh(
+new THREE.ConeGeometry(r,h,5),
+new THREE.MeshStandardMaterial({color:0x536d78})
+);
+m.position.set((Math.random()-.5)*1500,-110+h/2,-500-Math.random()*800);
+scene.add(m);
+}
+
+// Clouds
+for(let i=0;i<90;i++){
+let g=new THREE.Group();
+for(let j=0;j<4;j++){
+let s=new THREE.Mesh(
+new THREE.SphereGeometry(12+Math.random()*16,9,7),
+new THREE.MeshLambertMaterial({color:0xf2f7f7,transparent:true,opacity:.76})
+);
+s.position.set(j*17,Math.random()*8,Math.random()*12);
+g.add(s);
+}
+g.position.set((Math.random()-.5)*1800,30+Math.random()*170,-Math.random()*1500);
+scene.add(g);
+}
+
+// Fighter jet
+jet=new THREE.Group();
+
+let body=new THREE.MeshStandardMaterial({color:0x657784,metalness:.65,roughness:.36});
+let dark=new THREE.MeshStandardMaterial({color:0x172b39});
+let glass=new THREE.MeshStandardMaterial({color:0x193d53,metalness:.7});
+
+let fus=new THREE.Mesh(new THREE.CylinderGeometry(.55,.8,12,12),body);
+fus.rotation.x=Math.PI/2;
+jet.add(fus);
+
+let nose=new THREE.Mesh(new THREE.ConeGeometry(.55,3,12),body);
+nose.rotation.x=-Math.PI/2;
+nose.position.z=-7.2;
+jet.add(nose);
+
+let wing=new THREE.Mesh(new THREE.BoxGeometry(12,.22,3.4),body);
+wing.position.set(0,-.1,-.5);
+jet.add(wing);
+
+let tail=new THREE.Mesh(new THREE.BoxGeometry(5,.18,1.5),body);
+tail.position.set(0,.15,4.5);
+jet.add(tail);
+
+for(let x of [-1.7,1.7]){
+let fin=new THREE.Mesh(new THREE.BoxGeometry(.18,2.1,1.8),body);
+fin.position.set(x,1,4);
+jet.add(fin);
+}
+
+let canopy=new THREE.Mesh(
+new THREE.SphereGeometry(1,16,10,0,Math.PI*2,0,Math.PI/2),
+glass
+);
+canopy.scale.set(.8,.72,2);
+canopy.position.set(0,.65,-2.4);
+jet.add(canopy);
+
+for(let x of [-.6,.6]){
+let engine=new THREE.Mesh(new THREE.CylinderGeometry(.25,.3,2,12),dark);
+engine.rotation.x=Math.PI/2;
+engine.position.set(x,-.15,5.8);
+jet.add(engine);
+}
+
+scene.add(jet);
+jet.position.set(0,30,80);
+
+// Navigation gates
+for(let i=0;i<5;i++){
+let ring=new THREE.Mesh(
+new THREE.TorusGeometry(11,.6,10,36),
+new THREE.MeshBasicMaterial({color:0x76e8f1})
+);
+ring.position.set((i-2)*45,35+Math.sin(i)*12,-180-i*145);
+scene.add(ring);
+checkpoints.push(ring);
+}
+
+window.addEventListener('resize',resize);
+animate();
+renderPanels();
+
+setTimeout(()=>{
+document.getElementById('loading').style.display='none';
+},1600);
+}
+
+function resize(){
+camera.aspect=innerWidth/innerHeight;
+camera.updateProjectionMatrix();
+renderer.setSize(innerWidth,innerHeight);
+}
+
+function animate(){
+requestAnimationFrame(animate);
+let dt=Math.min(clock.getDelta(),.04);
+if(active)updateFlight(dt);
+renderer.render(scene,camera);
+}
+
+function updateFlight(dt){
+flightSeconds+=dt;
+
+let boost=keys.Shift?1.65:1;
+speed+=(boost-speed)*dt*.7;
+
+if(keys.a||keys.ArrowLeft)bank=Math.min(bank+dt*1.15,.8);
+else if(keys.d||keys.ArrowRight)bank=Math.max(bank-dt*1.15,-.8);
+else bank*=.97;
+
+if(keys.w||keys.ArrowUp)pitch=Math.min(pitch+dt*.55,.55);
+else if(keys.s||keys.ArrowDown)pitch=Math.max(pitch-dt*.55,-.55);
+else pitch*=.99;
+
+heading+=bank*dt*.65;
+jet.rotation.set(pitch,heading,-bank);
+
+jet.position.x-=Math.sin(heading)*speed*dt*48;
+jet.position.y+=pitch*speed*dt*22;
+jet.position.z-=speed*dt*95;
+
+jet.position.y=Math.max(8,Math.min(240,jet.position.y));
+
+camera.position.lerp(
+new THREE.Vector3(jet.position.x,jet.position.y+8,jet.position.z+25),.08
+);
+camera.lookAt(jet.position.x,jet.position.y,jet.position.z-35);
+
+checkpoints.forEach((g,i)=>{
+if(i<checkpointIndex)return;
+if(g.position.distanceTo(jet.position)<17){
+checkpointIndex++;
+document.getElementById('route').textContent=checkpointIndex+' / 5';
+toast('CHECKPOINT '+checkpointIndex+' / 5');
+if(checkpointIndex===5)finishMission();
+}
+});
+
+document.getElementById('alt').textContent=Math.round(2500+(jet.position.y-30)*95);
+document.getElementById('spd').textContent=Math.round(420*speed);
+document.getElementById('hdg').textContent=String(Math.round((heading*180/Math.PI+360)%360)).padStart(3,'0');
+document.getElementById('timer').textContent=new Date(flightSeconds*1000).toISOString().slice(14,19);
+}
+
+function startFlight(){
+hidePanels();
+document.getElementById('menu').style.display='none';
+active=true;
+checkpointIndex=0;
+flightSeconds=0;
+jet.position.set(0,30,80);
+jet.rotation.set(0,0,0);
+heading=0;pitch=0;bank=0;
+document.getElementById('route').textContent='0 / 5';
+document.getElementById('hud').style.display='block';
+document.getElementById('controls').style.display='block';
+toast('FLIGHT DECK READY');
+}
+
+function finishMission(){
+active=false;
+completed++;
+credits+=350;
+updateTop();
+document.getElementById('hud').style.display='none';
+document.getElementById('controls').style.display='none';
+document.getElementById('menu').style.display='block';
+toast('MISSION COMPLETE! +350 CREDITS');
+renderPanels();
+}
+
+function returnBase(){
+if(!active)return;
+active=false;
+document.getElementById('hud').style.display='none';
+document.getElementById('controls').style.display='none';
+document.getElementById('menu').style.display='block';
+toast('RETURNED TO BASE');
+}
+
+window.addEventListener('keydown',e=>{
+keys[e.key]=true;
+if(e.key==='Escape')returnBase();
+});
+window.addEventListener('keyup',e=>keys[e.key]=false);
+
+function toast(msg){
+let el=document.getElementById('toast');
+el.textContent=msg;
+el.style.display='block';
+clearTimeout(window.toastTimer);
+window.toastTimer=setTimeout(()=>el.style.display='none',2200);
+}
+
+function showPanel(id){
+hidePanels();
+document.getElementById('menu').style.display='none';
+document.getElementById(id).style.display='block';
+renderPanels();
+}
+
+function hidePanels(){
+['mission','hangar','shop','quests'].forEach(x=>{
+document.getElementById(x).style.display='none';
+});
+if(!active)document.getElementById('menu').style.display='block';
+}
+
+function updateTop(){
+document.getElementById('credits').textContent=credits;
+document.getElementById('rank').textContent=completed>2?'WING COMMANDER / 03':completed>0?'PILOT / 02':'CADET / 01';
+}
+
+function renderPanels(){
+
+document.getElementById('missionCards').innerHTML=missions.map((m,i)=>`
+<div class="card">
+<div class="eyebrow">${m.type}</div>
+<h3>${m.name}</h3>
+<p>${m.desc}</p>
+<div class="price">REWARD · ${m.reward} CR</div>
+<button class="primary" onclick="launchMission(${i})">ACCEPT MISSION</button>
+</div>`).join('');
+
+document.getElementById('planeCards').innerHTML=planes.map(p=>`
+<div class="card">
+<div class="eyebrow">TACTICAL AIRCRAFT</div>
+<h3>${p.name}</h3>
+<p>${p.desc}</p>
+<p>${p.stats}</p>
+<button onclick="selectPlane('${p.name}')">${selected===p.name?'CURRENT AIRCRAFT':owned.includes(p.name)?'SELECT':'LOCKED'}</button>
+</div>`).join('');
+
+let pilots=[
+{name:'Mara Voss',price:600,desc:'Veteran flight instructor'},
+{name:'Eli Navarro',price:850,desc:'Precision navigation specialist'},
+{name:'Rin Okafor',price:1200,desc:'Advanced test pilot'}
+];
+
+document.getElementById('shopCards').innerHTML=
+planes.slice(1).map(p=>`
+<div class="card">
+<div class="eyebrow">AIRCRAFT</div>
+<h3>${p.name}</h3>
+<p>${p.desc}</p>
+<div class="price">${p.price} CR</div>
+<button onclick="buyPlane('${p.name}')">${owned.includes(p.name)?'OWNED':'PURCHASE'}</button>
+</div>`).join('')+
+pilots.map(p=>`
+<div class="card">
+<div class="eyebrow">FLIGHT CREW</div>
+<h3>${p.name}</h3>
+<p>${p.desc}</p>
+<div class="price">${p.price} CR</div>
+<button onclick="buyPilot('${p.name}',${p.price})">${pilotsOwned.includes(p.name)?'RECRUITED':'RECRUIT PILOT'}</button>
+</div>`).join('');
+
+document.getElementById('questCards').innerHTML=`
+<div class="card"><h3>Navigation Trainee</h3><p>Complete your first flight route.</p><p>${Math.min(completed,1)} / 1 COMPLETE</p></div>
+<div class="card"><h3>Sky Explorer</h3><p>Complete three routes.</p><p>${Math.min(completed,3)} / 3 COMPLETE</p></div>
+<div class="card"><h3>Flight Hours</h3><p>Spend five minutes in flight.</p><p>${Math.min(Math.floor(flightSeconds/60),5)} / 5 COMPLETE</p></div>`;
+}
+
+function launchMission(i){
+toast('OPERATION: '+missions[i].name);
+startFlight();
+}
+
+function selectPlane(n){
+if(!owned.includes(n)){
+toast('Aircraft locked. Visit the store.');
+return;
+}
+selected=n;
+toast(n+' selected');
+renderPanels();
+}
+
+function buyPlane(n){
+let p=planes.find(x=>x.name===n);
+if(owned.includes(n)||credits<p.price){
+toast('Cannot purchase aircraft');
+return;
+}
+credits-=p.price;
+owned.push(n);
+selected=n;
+updateTop();
+renderPanels();
+toast(n+' acquired!');
+}
+
+function buyPilot(n,c){
+if(pilotsOwned.includes(n)||credits<c){
+toast('Cannot recruit pilot');
+return;
+}
+credits-=c;
+pilotsOwned.push(n);
+updateTop();
+renderPanels();
+toast(n+' joined your squadron!');
+}
+
+init();
+</script>
+</body>
+</html>
